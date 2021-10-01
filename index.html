@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html
+  lang="en-us"
+  style="height: 100%">
+
+<head>
+  <meta
+    charset="utf-8">
+  <meta
+    http-equiv="Content-Type"
+    content="text/html; charset=utf-8">
+  <meta
+    name="viewport"
+    content="user-scalable=no"/>
+
+  <script
+    src="https://connect.facebook.net/en_US/fbinstant.6.3.js"></script>
+
+  <script>
+    FBInstant.initializeAsync()
+      .then(onInit);
+
+    function onInit() {
+      printLogInit();
+
+      FBInstant.player.getSignedPlayerInfoAsync()
+        .then(function (playerInfo) {
+          function callLoadGame(hasPayments) {
+            loadGame(playerInfo.getPlayerID(), playerInfo.getSignature(), hasPayments);
+          }
+
+          FBInstant.payments.onReady(function () {
+            FBInstant.payments.getCatalogAsync()
+              .then(function () {
+                callLoadGame(true);
+              })
+              .catch(function (error) {
+                console.warn("Payments disabled: " + error);
+                callLoadGame(false);
+              });
+          });
+        });
+    }
+
+    function loadGame(fbPlayerId, fbSignature, hasPayments) {
+      FBInstant.startGameAsync().then(function () {
+        FBInstant.payments.getCatalogAsync().then(function (catalog) {
+          var buttons = document.getElementById('buttons');
+          for (const item of catalog) {
+            console.log(JSON.stringify(item));
+            var row = document.createElement("div");
+            var button = document.createElement("button");
+            button.innerText = item.productID + ' for ' + item.price;
+            button.onclick = function () {
+              doPayment(item);
+            };
+            row.appendChild(button);
+            buttons.appendChild(row);
+          }
+        });
+      });
+
+      console.log('fbPlayerId: ' + fbPlayerId);
+      console.log('hasPayments: ' + hasPayments);
+    }
+
+    function doPayment(item) {
+      console.log('doPayment for ' + item.productID);
+      FBInstant.payments.purchaseAsync({
+        productID: item.productID
+      }).then(function (purchase) {
+        console.log('Got purchase: ' + JSON.stringify(purchase));
+        FBInstant.payments.consumePurchaseAsync(purchase.purchaseToken)
+          .then(function () {
+            // Purchase successfully consumed!
+            console.log('Purchase successfully consumed!');
+            window.alert('Purchase successfully consumed!');
+          }).catch(function (error) {
+          console.error('Error consuming purchase: ' + JSON.stringify(error));
+        });
+      });
+    }
+
+    function printLogInit() {
+      var logEl = document.getElementById("log");
+      if (!logEl) {
+        console.warn('No #log element found, log printer will not be connected');
+        return;
+      }
+      logEl.style.display = 'inherit';
+
+      function printLogFn(realFn, tpe) {
+        return function () {
+          var row = document.createElement("div");
+          if (tpe == "warn") row.style.color = '#fff347';
+          else if (tpe == "error") row.style.color = '#ff5533';
+          else row.style.color = '#fff';
+          row.appendChild(document.createTextNode(tpe + ": " + [].slice.call(arguments).join(', ')));
+          logEl.appendChild(row);
+
+          realFn.apply(null, arguments);
+        }
+      }
+
+      console.debug = printLogFn(console.debug, "debug");
+      console.log = printLogFn(console.log, "log");
+      console.warn = printLogFn(console.warn, "warn");
+      console.error = printLogFn(console.error, "error");
+    }
+  </script>
+</head>
+<body>
+<div
+  id="buttons"></div>
+<div
+  id="log"
+  style="max-height:500px; overflow-y: scroll"></div>
+</body>
+</html>
